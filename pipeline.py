@@ -16,9 +16,12 @@ Usage:
 """
 
 import argparse
+import os
 import random
+import tempfile
 
 import pandas as pd
+import requests
 
 import config
 import evidence_store
@@ -29,6 +32,32 @@ PRIORITY_KEYWORDS = [
     "chatbot", "generative ai", "healthcare", "welfare", "eligibility",
     "predictive",
 ]
+
+
+def download_tender_document(url: str, timeout: int = 20) -> str:
+    """
+    Downloads a tender_document_url to a temp PDF file for governance
+    extraction. Real government portal links are inconsistent — some are
+    direct PDFs, many are HTML detail pages, login-gated, or dead. This
+    only accepts responses that actually look like a PDF; everything else
+    returns None so the caller can fall back gracefully instead of
+    crashing the pipeline on one bad link.
+    """
+    if not url or not isinstance(url, str) or not url.startswith("http"):
+        return None
+    try:
+        resp = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
+        resp.raise_for_status()
+        content_type = resp.headers.get("Content-Type", "")
+        is_pdf = "pdf" in content_type.lower() or resp.content[:4] == b"%PDF"
+        if not is_pdf:
+            return None
+        fd, path = tempfile.mkstemp(suffix=".pdf")
+        with os.fdopen(fd, "wb") as f:
+            f.write(resp.content)
+        return path
+    except requests.RequestException:
+        return None
 
 
 def select_deep_dive_candidates(verified_df: pd.DataFrame, top_n: int = 15) -> pd.DataFrame:
@@ -112,9 +141,16 @@ def run_pipeline(top_n: int = 15, mock: bool = True):
             governance = _mock_governance_result(row["title"], row["tender_description"])
         else:
             from governance_extractor import extract_governance_evidence
-            # In a real run you'd first download row["tender_document_url"]
-            # to a local PDF path and pass pdf_path=... here.
-            governance = extract_governance_evidence(raw_text=row["tender_description"])
+            pdf_path = download_tender_document(row.get("tender_document_url"))
+            if pdf_path:
+                governance = extract_governance_evidence(pdf_path=pdf_path)
+                os.remove(pdf_path)
+            else:
+                # Document wasn't a fetchable PDF (portal login wall, HTML
+                # notice page, dead link, etc.) — fall back to whatever
+                # text we already have from the tender record itself
+                # rather than skipping the tender entirely.
+                governance = extract_governance_evidence(raw_text=row["tender_description"])
 
         impact = classify_impact(row["title"], row["tender_description"], row.get("ai_types", ""))
 
