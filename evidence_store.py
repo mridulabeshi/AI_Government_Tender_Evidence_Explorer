@@ -8,7 +8,7 @@ later without changing the calling code much).
 import json
 import sqlite3
 
-from src import config
+import config
 
 
 SCHEMA = """
