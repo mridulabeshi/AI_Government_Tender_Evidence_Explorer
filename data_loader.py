@@ -21,9 +21,15 @@ import pandas as pd
 
 import config
 
-HF_PARQUET_URL = (
-    "hf://datasets/rumourscape/tenders/data/train-00000-of-*.parquet"
+# The dataset's auto-converted Parquet files live on the special
+# `refs/convert/parquet` ref (not `main`), split across 7 files
+# (~1.72GB / 4.92M rows total). Real, verified file list as of Aug 2026 —
+# see https://huggingface.co/datasets/rumourscape/tenders/tree/refs%2Fconvert%2Fparquet/default/train
+_HF_BASE = (
+    "https://huggingface.co/datasets/rumourscape/tenders/resolve/"
+    "refs%2Fconvert%2Fparquet/default/train"
 )
+HF_PARQUET_FILES = [f"{_HF_BASE}/000{i}.parquet" for i in range(7)]  # 0000..0006
 
 REQUIRED_COLUMNS = [
     "tender_id", "organisation", "state", "title", "tender_description",
@@ -31,20 +37,58 @@ REQUIRED_COLUMNS = [
     "detail_url", "tender_document_url",
 ]
 
+# The real dataset's raw column names don't match REQUIRED_COLUMNS, so this
+# SQL fragment renames/derives everything downstream code expects in one
+# pass, run directly against the remote files (no full local materialize).
+# `state` doesn't exist as a column: portal_type distinguishes state vs.
+# central portals, and for state-portal rows organisation_name IS the
+# state (e.g. "Punjab", "Maharashtra"); central rows get labeled "Central".
+_REAL_DATASET_SELECT = """
+    SELECT
+        tender_id,
+        organisation_name AS organisation,
+        CASE WHEN portal_type ILIKE '%state%' THEN organisation_name
+             ELSE 'Central' END AS state,
+        title,
+        tender_description,
+        tender_type,
+        CAST(closing_at AS VARCHAR) AS date,
+        contract_value_amount AS contract_value,
+        selected_bidder,
+        detail_url,
+        tender_document_url
+    FROM read_parquet({files})
+"""
 
-def load_real_dataset() -> pd.DataFrame:
+
+def _files_sql_list(files: list) -> str:
+    return "[" + ", ".join(f"'{f}'" for f in files) + "]"
+
+
+def get_real_dataset_connection(limit_files: int = None):
     """
-    Pull the dataset straight from Hugging Face using DuckDB's hf:// reader
-    and materialize it to local Parquet. Requires network access to
-    huggingface.co and the `duckdb` httpfs/hf extensions.
+    Returns a DuckDB connection with `httpfs` loaded, ready to query the
+    real dataset directly over HTTPS. Does NOT download/materialize
+    anything yet — queries against the returned connection are only
+    evaluated (and only pull the matching rows into memory) when you
+    actually call .execute(...).df() on a SELECT, which is what
+    ai_discovery.py's Stage 1 filter does. This is what keeps memory
+    bounded on the full 4.92M-row / 1.72GB corpus.
+
+    limit_files: for quick testing, only query the first N of the 7
+    remote files instead of all of them (full corpus needs no argument).
     """
     con = duckdb.connect()
     con.execute("INSTALL httpfs; LOAD httpfs;")
-    query = f"SELECT * FROM read_parquet('{HF_PARQUET_URL}')"
-    df = con.execute(query).df()
-    os.makedirs(config.DATA_DIR, exist_ok=True)
-    df.to_parquet(config.RAW_PARQUET, index=False)
-    return df
+    files = HF_PARQUET_FILES if not limit_files else HF_PARQUET_FILES[:limit_files]
+    con.execute(f"CREATE OR REPLACE VIEW tenders AS {_REAL_DATASET_SELECT.format(files=_files_sql_list(files))}")
+    return con
+
+
+def preview_real_dataset(n: int = 5, limit_files: int = 1) -> pd.DataFrame:
+    """Quick sanity check: pull just a handful of rows, bounded memory."""
+    con = get_real_dataset_connection(limit_files=limit_files)
+    return con.execute(f"SELECT * FROM tenders LIMIT {n}").df()
 
 
 def generate_sample_dataset(n: int = 500, seed: int = 42) -> pd.DataFrame:
