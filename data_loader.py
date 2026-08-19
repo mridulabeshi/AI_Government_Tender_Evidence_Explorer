@@ -6,8 +6,8 @@ Loads the `rumourscape/tenders` Indian government procurement dataset
 file so every later stage can query it cheaply with DuckDB.
 
 Usage:
-    python -m src.data_loader                 # download real dataset
-    python -m src.data_loader --sample 500     # generate a synthetic
+    python data_loader.py                 # download real dataset
+    python data_loader.py --sample 500     # generate a synthetic
                                                 # sample instead (useful
                                                 # for offline dev/demo)
 """
@@ -19,7 +19,7 @@ import random
 import duckdb
 import pandas as pd
 
-from src import config
+import config
 
 HF_PARQUET_URL = (
     "hf://datasets/rumourscape/tenders/data/train-00000-of-*.parquet"
