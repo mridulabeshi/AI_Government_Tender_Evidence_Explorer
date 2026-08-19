@@ -24,7 +24,7 @@ import re
 import duckdb
 import pandas as pd
 
-from src import config
+import config
 
 
 def _build_keyword_regex(keywords):
