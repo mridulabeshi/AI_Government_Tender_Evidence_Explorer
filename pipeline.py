@@ -8,7 +8,7 @@ governance evidence) and Stage 4 (impact classification), persisting
 results to the evidence database.
 
 Usage:
-    python -m src.pipeline --top-n 15 --mock
+    python pipeline.py --top-n 15 --mock
         --mock uses a built-in synthetic document generator instead of
         downloading + calling Claude on real PDFs, so the full pipeline
         can be demoed/tested offline. Drop --mock (and set
@@ -20,8 +20,9 @@ import random
 
 import pandas as pd
 
-from src import config, evidence_store
-from src.impact_classifier import classify_impact
+import config
+import evidence_store
+from impact_classifier import classify_impact
 
 PRIORITY_KEYWORDS = [
     "facial recognition", "surveillance", "biometric", "computer vision",
@@ -110,7 +111,7 @@ def run_pipeline(top_n: int = 15, mock: bool = True):
         if mock:
             governance = _mock_governance_result(row["title"], row["tender_description"])
         else:
-            from src.governance_extractor import extract_governance_evidence
+            from governance_extractor import extract_governance_evidence
             # In a real run you'd first download row["tender_document_url"]
             # to a local PDF path and pass pdf_path=... here.
             governance = extract_governance_evidence(raw_text=row["tender_description"])
