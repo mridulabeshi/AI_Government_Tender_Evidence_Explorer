@@ -24,8 +24,8 @@ Set ANTHROPIC_API_KEY in the environment before running.
 import json
 import os
 
-from src import config
-from src.document_extractor import extract_pages, chunk_pages, extract_pages_from_text
+import config
+from document_extractor import extract_pages, chunk_pages, extract_pages_from_text
 
 EXTRACTION_SYSTEM_PROMPT = """You are a careful legal/technical analyst reading Indian government tender documents to extract evidence about AI governance requirements.
 
@@ -167,7 +167,7 @@ def extract_governance_evidence(pdf_path: str = None, raw_text: str = None) -> d
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
-        print("Usage: python -m src.governance_extractor <path_to_pdf>")
+        print("Usage: python governance_extractor.py <path_to_pdf>")
         sys.exit(0)
     result = extract_governance_evidence(pdf_path=sys.argv[1])
     print(json.dumps(result, indent=2))
