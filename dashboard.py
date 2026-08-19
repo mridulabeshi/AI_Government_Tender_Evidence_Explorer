@@ -14,7 +14,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from src import config, evidence_store
+import config
+import evidence_store
 
 st.set_page_config(page_title="AI Government Tender Evidence Explorer", layout="wide")
 
@@ -72,8 +73,8 @@ with tab1:
     if df.empty:
         st.warning(
             "No discovery data found. Run:\n\n"
-            "`python -m src.data_loader --sample 500` then "
-            "`python -m src.ai_discovery`"
+            "`python data_loader.py --sample 500` then "
+            "`python ai_discovery.py`"
         )
     else:
         verified = df[df["verified"]]
@@ -114,7 +115,7 @@ if not profiles:
     with tab2:
         st.warning(
             "No governance profiles yet. Run:\n\n"
-            "`python -m src.pipeline --top-n 15 --mock`"
+            "`python pipeline.py --top-n 15 --mock`"
         )
     with tab3:
         st.info("Select a tender in the Tender Profile tab first.")
