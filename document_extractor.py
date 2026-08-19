@@ -123,7 +123,7 @@ def chunk_pages(pages: list, max_chars: int = 6000) -> list:
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
-        print("Usage: python -m src.document_extractor <path_to_pdf>")
+        print("Usage: python document_extractor.py <path_to_pdf>")
         sys.exit(0)
     pages = extract_pages(sys.argv[1])
     print(f"Extracted {len(pages)} pages")
