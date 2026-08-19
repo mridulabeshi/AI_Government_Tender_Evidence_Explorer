@@ -6,6 +6,7 @@ later without changing the calling code much).
 """
 
 import json
+import os
 import sqlite3
 
 import config
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS tender_profiles (
 
 
 def get_connection():
+    os.makedirs(config.DATA_DIR, exist_ok=True)
     conn = sqlite3.connect(config.EVIDENCE_DB)
     conn.execute(SCHEMA)
     return conn
