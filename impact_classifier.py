@@ -8,7 +8,7 @@ can point to exactly which phrase in the title/description/ai_types
 triggered it, which is shown to the user alongside the verdict.
 """
 
-from src import config
+import config
 
 
 def classify_impact(title: str, description: str, ai_types: str = "") -> dict:
